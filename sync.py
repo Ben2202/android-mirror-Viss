@@ -1,5 +1,8 @@
 import threading
+
 from touch import listen_touch
+from parser import parse_event
+from inject import send_event
 
 running = False
 
@@ -18,12 +21,11 @@ def start_sync(master, followers):
     print("FOLLOWERS :", followers)
     print("=" * 50)
 
-    thread = threading.Thread(
+    threading.Thread(
         target=sync_loop,
         args=(master, followers),
-        daemon=True
-    )
-    thread.start()
+        daemon=True,
+    ).start()
 
 
 def stop_sync():
@@ -33,7 +35,24 @@ def stop_sync():
 
 
 def sync_loop(master, followers):
-    listen_touch(master)
+    global running
 
-    while running:
-        pass
+    for event in listen_touch(master):
+
+        if not running:
+            break
+
+        parsed = parse_event(event)
+
+        if parsed is None:
+            continue
+
+        event_type, event_code, event_value = parsed
+
+        for follower in followers:
+            send_event(
+                follower,
+                event_type,
+                event_code,
+                event_value,
+            )
