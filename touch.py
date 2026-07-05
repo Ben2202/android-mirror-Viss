@@ -1,5 +1,7 @@
 import subprocess
 
+_processes = {}
+
 
 def listen_touch(master_serial):
     """
@@ -23,7 +25,12 @@ def listen_touch(master_serial):
         bufsize=1
     )
 
+    _processes[master_serial] = process
+
     try:
+        if process.stdout is None:
+            return
+
         for line in process.stdout:
 
             line = line.strip()
@@ -59,4 +66,24 @@ def listen_touch(master_serial):
             yield event
 
     finally:
-        process.kill()
+        _processes.pop(master_serial, None)
+
+        if process.poll() is None:
+            try:
+                process.kill()
+            except OSError:
+                pass
+
+
+def stop_listening(master_serial=None):
+    serials = [master_serial] if master_serial else list(_processes)
+
+    for serial in serials:
+        process = _processes.get(serial)
+        if process is None or process.poll() is not None:
+            continue
+
+        try:
+            process.terminate()
+        except OSError:
+            pass
